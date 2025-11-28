@@ -1,0 +1,643 @@
+<!DOCTYPE html>          
+<html lang="en">          
+<head>          
+    <meta charset="UTF-8">          
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">          
+    <title>Arix Signature - Crystal Memories</title>          
+    <style>          
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap');          
+          
+        * { box-sizing: border-box; }          
+        html, body {          
+            margin: 0; padding: 0; width: 100%; height: 100%;          
+            background-color: #000502;          
+            overflow: hidden;          
+            font-family: 'Cinzel', serif;          
+        }          
+          
+        #canvas-container {          
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;          
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);          
+        }          
+          
+        /* UI Layer */        
+        .ui-overlay {        
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;        
+            pointer-events: none;        
+            display: flex; flex-direction: column; justify-content: space-between; align-items: center;        
+            padding: 60px 20px;        
+            transition: opacity 1s ease;        
+        }        
+        .ui-hidden { opacity: 0; }        
+        .ui-visible { opacity: 1; }        
+          
+        .header-area {          
+            text-align: center; color: #ffd700;          
+            text-shadow: 0 0 30px rgba(255, 215, 0, 0.4), 0 0 10px rgba(0,0,0,0.8);        
+            margin-top: 20px;        
+        }          
+        h1 { margin: 0; font-size: 3.5rem; letter-spacing: 15px; font-weight: 700; background: linear-gradient(to bottom, #fffbf0, #ffcf40); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }          
+        h2 { margin: 15px 0 0 0; font-size: 0.9rem; letter-spacing: 8px; color: #a0a0a0; text-transform: uppercase; font-weight: 400; border-top: 1px solid rgba(255, 207, 64, 0.3); border-bottom: 1px solid rgba(255, 207, 64, 0.3); padding: 10px 40px; display: inline-block;}          
+          
+        .controls-area {          
+            pointer-events: auto; margin-bottom: 50px;          
+            text-align: center;        
+            display: flex; flex-direction: column; align-items: center; gap: 15px;    
+        }          
+                
+        .status-text {        
+            color: #ffcf40; font-size: 0.7rem; letter-spacing: 3px;        
+            opacity: 0.6; text-transform: uppercase;        
+            margin-bottom: 5px;        
+            text-shadow: 0 0 10px rgba(255, 207, 64, 0.5);        
+        }        
+          
+        .btn-group {    
+            display: flex; gap: 20px;    
+            align-items: center;    
+        }    
+    
+        .btn {          
+            background: rgba(20, 25, 20, 0.6);          
+            border: 1px solid #ffcf40;          
+            color: #ffcf40;          
+            padding: 15px 40px;          
+            font-family: 'Cinzel', serif; font-size: 0.9rem; font-weight: 700;          
+            cursor: pointer; text-transform: uppercase; letter-spacing: 4px;          
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);          
+            backdrop-filter: blur(15px);          
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);          
+        }          
+        .btn:hover { background: #ffcf40; color: #000; box-shadow: 0 0 40px rgba(255, 207, 64, 0.6); transform: translateY(-2px); }        
+            
+        .file-input-wrapper {    
+            position: relative;    
+            overflow: hidden;    
+            display: inline-block;    
+        }    
+        .file-input-wrapper input[type=file] {    
+            font-size: 100px;    
+            position: absolute;    
+            left: 0;    
+            top: 0;    
+            opacity: 0;    
+            cursor: pointer;    
+        }    
+                
+        /* Intro Screen */        
+        #intro-screen {        
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20;        
+            background: rgba(0, 5, 2, 0.85);        
+            backdrop-filter: blur(10px);        
+            display: flex; flex-direction: column; justify-content: center; align-items: center;        
+            transition: opacity 0.8s ease-out, visibility 0.8s;        
+        }        
+        #intro-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }        
+        
+        /* Webcam Preview */        
+        #webcam-container {          
+            position: absolute;          
+            top: 20px; right: 20px;         
+            width: 160px; height: 120px;          
+            z-index: 30;          
+            border: 1px solid rgba(255, 207, 64, 0.6);        
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);        
+            border-radius: 8px;          
+            opacity: 0;         
+            transition: opacity 0.5s;        
+            pointer-events: none;        
+            background: rgba(0,0,0,0.5);      
+            overflow: hidden;      
+        }          
+        #webcam-container.active { opacity: 1; }      
+        #webcam-video { display: none; }          
+        #webcam-canvas { width: 100%; height: 100%; display: block; }          
+    </style>          
+          
+    <!-- AI Models -->      
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>          
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>          
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>          
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>          
+          
+    <!-- React & Three.js Import Map -->      
+    <script type="importmap">          
+        {          
+            "imports": {          
+                "react": "https://esm.sh/react@18.2.0",          
+                "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",          
+                "react-dom": "https://esm.sh/react-dom@18.2.0",          
+                "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",          
+                "three": "https://esm.sh/three@0.160.0",          
+                "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.15.16?external=react,react-dom,three",          
+                "@react-three/drei": "https://esm.sh/@react-three/drei@9.99.0?external=react,react-dom,three,@react-three/fiber",          
+                "@react-three/postprocessing": "https://esm.sh/@react-three/postprocessing@2.16.0?external=react,react-dom,three,@react-three/fiber",          
+                "uuid": "https://esm.sh/uuid@9.0.1"          
+            }          
+        }          
+    </script>          
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>          
+</head>          
+<body>          
+    <div id="canvas-container"></div>          
+          
+    <script type="text/babel" data-type="module" data-presets="react">          
+        import React, { useState, useMemo, useRef, useEffect } from 'react';          
+        import { createRoot } from 'react-dom/client';          
+        import * as THREE from 'three';          
+        import { Canvas, useFrame, useThree } from '@react-three/fiber';          
+        import { OrbitControls, Float, Sparkles, Stars, Environment, Lightformer, RoundedBox } from '@react-three/drei';          
+        import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';          
+          
+        const CONFIG = {          
+            particleCount: 6000,       
+            treeHeight: 18,          
+            treeRadius: 7.5,          
+            scatterRadius: 50,     
+        };          
+          
+        const handState = { isFist: false, posX: 0, posY: 0, active: false };          
+          
+        // --- Hand Tracker ---          
+        const HandTracker = ({ onStateChange, setStatus }) => {          
+            const videoRef = useRef(null);          
+            const canvasRef = useRef(null);          
+          
+            useEffect(() => {          
+                if (!window.Hands || !window.Camera) {          
+                    setStatus("Libraries Loading...");          
+                    return;          
+                }          
+                const hands = new window.Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});          
+                hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5 });          
+                hands.onResults((results) => {          
+                    if (canvasRef.current) {          
+                        const canvas = canvasRef.current;      
+                        canvas.width = results.image.width;          
+                        canvas.height = results.image.height;          
+                        const ctx = canvas.getContext('2d');          
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);          
+                        ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);      
+                        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {          
+                            const el = document.getElementById('webcam-container');      
+                            if(el) el.classList.add('active');          
+                            const landmarks = results.multiHandLandmarks[0];          
+                            window.drawConnectors(ctx, landmarks, window.HAND_CONNECTIONS, {color: '#FFD700', lineWidth: 2});          
+                            window.drawLandmarks(ctx, landmarks, {color: '#FFFFFF', lineWidth: 1, radius: 3});          
+                            const rawX = landmarks[9].x; const rawY = landmarks[9].y;      
+                            let dx = 0; let dy = 0;      
+                            if (rawX < 0.4) dx = -1.0; if (rawX > 0.6) dx = 1.0; if (rawY < 0.4) dy = 1.0; if (rawY > 0.6) dy = -1.0;       
+                            const forceX = (rawX - 0.5) * 2.0; const forceY = (rawY - 0.5) * 2.0;      
+                            handState.posX = forceX; handState.posY = -forceY; handState.active = true;          
+                            const wrist = landmarks[0]; const tips = [8, 12, 16, 20];          
+                            let avgDist = 0;          
+                            tips.forEach(i => { avgDist += Math.sqrt(Math.pow(landmarks[i].x - wrist.x, 2) + Math.pow(landmarks[i].y - wrist.y, 2)); });          
+                            avgDist /= 4;          
+                            const isFist = avgDist < 0.20;          
+                            handState.isFist = isFist;          
+                            onStateChange(isFist);          
+                        } else {          
+                            handState.active = false; handState.posX = 0; handState.posY = 0;          
+                        }          
+                    }          
+                });          
+                const camera = new window.Camera(videoRef.current, {          
+                    onFrame: async () => { if(hands) await hands.send({image: videoRef.current}); }, width: 320, height: 240          
+                });          
+                setStatus("Start Camera...");          
+                camera.start().then(() => {      
+                    setStatus("Ready: Open Hand / Fist");      
+                    document.getElementById('webcam-container').classList.add('active');      
+                }).catch((e) => setStatus("Camera Denied"));          
+                return () => { camera.stop(); if(hands) hands.close(); }          
+            }, []);          
+            return (          
+                <div id="webcam-container">          
+                    <video ref={videoRef} id="webcam-video" playsInline style={{display: 'none'}}></video>          
+                    <canvas ref={canvasRef} id="webcam-canvas"></canvas>          
+                </div>          
+            );          
+        };          
+          
+        // --- Camera & Navigation ---          
+        const CameraController = () => {          
+            const { camera, gl } = useThree();          
+            const controlsRef = useRef();          
+            useFrame((state, delta) => {          
+                if (controlsRef.current && handState.active && !handState.isFist) {          
+                    const speed = 1.5 * delta; const deadzone = 0.15;       
+                    let rotX = 0; let rotY = 0;      
+                    if (Math.abs(handState.posX) > deadzone) rotX = (handState.posX - (Math.sign(handState.posX) * deadzone)) * speed;      
+                    if (Math.abs(handState.posY) > deadzone) rotY = (handState.posY - (Math.sign(handState.posY) * deadzone)) * speed * 0.5;      
+                    controlsRef.current.setAzimuthalAngle(controlsRef.current.getAzimuthalAngle() - rotX);      
+                    controlsRef.current.setPolarAngle(THREE.MathUtils.clamp(controlsRef.current.getPolarAngle() - rotY, 0.5, Math.PI - 0.5));      
+                    controlsRef.current.update();          
+                }          
+            });          
+            return <OrbitControls ref={controlsRef} enablePan={false} enableZoom={true} maxDistance={90} minDistance={20} enableDamping={true} dampingFactor={0.05} autoRotate={false} />;          
+        };          
+      
+        // --- Utils ---    
+        const getTreePos = (i, total, rMod = 1.0, hMod = 1.0) => {          
+            const y = (i / total) * CONFIG.treeHeight * hMod - (CONFIG.treeHeight * hMod / 2);          
+            const r = (1 - (y + CONFIG.treeHeight * hMod / 2) / (CONFIG.treeHeight * hMod)) * CONFIG.treeRadius * rMod;          
+            const a = i * 137.508;          
+            return new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r);          
+        };          
+        const getScatterPos = () => {          
+            const r = CONFIG.scatterRadius * Math.cbrt(Math.random());          
+            const theta = Math.random() * Math.PI * 2; const phi = Math.acos(2 * Math.random() - 1);          
+            return new THREE.Vector3(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));          
+        };          
+          
+        // --- BIGGER Particles (Foliage) ---          
+        const Foliage = ({ isTree }) => {          
+            const shaderRef = useRef();          
+            const { positions, attributes, uniforms } = useMemo(() => {          
+                const posS = [], posT = [], rands = [], dists = [];          
+                for(let i=0; i<CONFIG.particleCount; i++) {          
+                    const s = getScatterPos(); const t = getTreePos(i, CONFIG.particleCount);          
+                    t.addScalar((Math.random()-0.5)*0.5); t.x+=(Math.random()-0.5)*1.5; t.z+=(Math.random()-0.5)*1.5;          
+                    posS.push(s.x,s.y,s.z); posT.push(t.x,t.y,t.z);          
+                    rands.push(Math.random()); dists.push(Math.sqrt(t.x*t.x+t.z*t.z)/8.0);          
+                }          
+                return {          
+                    positions: new Float32Array(posS),          
+                    attributes: { scatter: new Float32Array(posS), tree: new Float32Array(posT), rand: new Float32Array(rands), dist: new Float32Array(dists) },          
+                    uniforms: { uTime: {value:0}, uMorph: {value:0}, uPix: {value: Math.min(window.devicePixelRatio, 2)}, cDeep: {value: new THREE.Color("#001a0d")}, cLight: {value: new THREE.Color("#1a6b42")}, cGold: {value: new THREE.Color("#ffdf80")} }          
+                };          
+            }, []);          
+            useFrame((state, delta) => {          
+                if(shaderRef.current) {          
+                    shaderRef.current.uniforms.uTime.value = state.clock.elapsedTime;          
+                    shaderRef.current.uniforms.uMorph.value = THREE.MathUtils.lerp(shaderRef.current.uniforms.uMorph.value, isTree?1:0, delta*2.0);          
+                }          
+            });    
+            const vs = `uniform float uTime, uMorph, uPix; attribute vec3 aPosScatter, aPosTree; attribute float aRand, dist; varying float vAlpha, vDist, vRand;          
+                float cubic(float t) { return t<0.5 ? 4.0*t*t*t : 1.0-pow(-2.0*t+2.0,3.0)/2.0; }          
+                void main() { float t = cubic(uMorph); vec3 pos = mix(aPosScatter, aPosTree, t);          
+                float wave = sin(uTime*1.5+pos.y*0.3+pos.x*0.3); pos += normalize(pos)*wave*(mix(2.0,0.15,t));          
+                vec4 mv = modelViewMatrix * vec4(pos, 1.0);     
+                gl_PointSize = (200.0*uPix)*(0.5+aRand*0.8)*(1.0/-mv.z);          
+                gl_Position = projectionMatrix * mv; vAlpha = 0.4+0.6*dist; vDist=dist; vRand=aRand; }`;          
+            const fs = `uniform vec3 cDeep, cLight, cGold; uniform float uTime; varying float vAlpha, vDist, vRand;          
+                void main() { vec2 uv = gl_PointCoord.xy-0.5; if(length(uv)>0.5) discard;          
+                float glow = pow(1.0-smoothstep(0.0,0.5,length(uv)), 1.5);          
+                vec3 col = mix(cDeep, cLight, smoothstep(0.2,0.8,vDist)); col = mix(col, cGold, smoothstep(0.7,1.0,vDist)*0.6);          
+                if(step(0.96, sin(uTime*4.0+vRand*100.0))>0.5) col += cGold*2.0;          
+                gl_FragColor = vec4(col, vAlpha*glow); }`;          
+            return <points><bufferGeometry><bufferAttribute attach="attributes-position" count={positions.length/3} array={positions} itemSize={3}/><bufferAttribute attach="attributes-aPosScatter" count={attributes.scatter.length/3} array={attributes.scatter} itemSize={3}/><bufferAttribute attach="attributes-aPosTree" count={attributes.tree.length/3} array={attributes.tree} itemSize={3}/><bufferAttribute attach="attributes-aRand" count={attributes.rand.length} array={attributes.rand} itemSize={1}/><bufferAttribute attach="attributes-dist" count={attributes.dist.length} array={attributes.dist} itemSize={1}/></bufferGeometry><shaderMaterial ref={shaderRef} vertexShader={vs} fragmentShader={fs} uniforms={uniforms} transparent depthWrite={false} blending={THREE.AdditiveBlending}/></points>;          
+        };          
+    
+        // --- High Quality Photo Element ---    
+        const PhotoElement = ({ isTree, textureObj, shape, scatterPos, treePos, index }) => {    
+            const meshRef = useRef();    
+            const progress = useRef(0);    
+            const speed = useRef(0.5 + Math.random()*0.5);    
+                
+            const tex = textureObj?.tex || null;    
+            const aspectRatio = textureObj?.aspect || 1.0;    
+    
+            useFrame((state, delta) => {    
+                if(meshRef.current) {    
+                    progress.current = THREE.MathUtils.lerp(progress.current, isTree ? 1 : 0, delta * (isTree ? 0.8 : 1.5));    
+                    const t = progress.current < 0.5 ? 4*progress.current*progress.current*progress.current : 1-Math.pow(-2*progress.current+2, 3)/2;    
+                    const pos = new THREE.Vector3().lerpVectors(scatterPos, treePos, t);    
+                        
+                    // Float animation    
+                    const time = state.clock.elapsedTime;    
+                    pos.y += Math.sin(time * speed.current + index) * (isTree ? 0.1 : 1.0);     
+                    pos.x += Math.cos(time * 0.5 + index) * (isTree ? 0.05 : 0.5);    
+    
+                    meshRef.current.position.copy(pos);    
+    
+                    if (isTree) {    
+                        meshRef.current.rotation.set(0, time*0.2, 0);    
+                        meshRef.current.lookAt(0, pos.y, 0);     
+                        meshRef.current.rotateY(Math.PI);    
+                    } else {    
+                        meshRef.current.rotation.x += delta * 0.2;    
+                        meshRef.current.rotation.y += delta * 0.1;    
+                    }    
+                        
+                    const scale = isTree ? 1.0 : 1.2;    
+                        
+                    // KEY: If it's a Box (Photo Frame), we scale the mesh to match the Aspect Ratio    
+                    if (shape === 'box') {    
+                        // Scale Width by Aspect, keep Height 1, Depth thin    
+                        // Base scale is 1.5 unit height    
+                        const baseH = 1.5 * scale;    
+                        meshRef.current.scale.set(baseH * aspectRatio, baseH, 0.1);    
+                    } else {    
+                        meshRef.current.scale.setScalar(scale);    
+                    }    
+                }    
+            });    
+    
+            // Materials for Photo Frames    
+            const photoMaterial = useMemo(() => new THREE.MeshStandardMaterial({    
+                map: tex,    
+                color: tex ? "#ffffff" : "#FFD700",    
+                emissive: tex ? "#222222" : "#000000",    
+                roughness: 0.4,    
+                metalness: 0.1,    
+            }), [tex]);    
+    
+            const whiteBackingMaterial = useMemo(() => new THREE.MeshStandardMaterial({    
+                color: "#eeeeee",    
+                roughness: 0.8,    
+                metalness: 0.0    
+            }), []);    
+    
+            const sphereMaterial = useMemo(() => new THREE.MeshStandardMaterial({    
+                map: tex,    
+                color: tex ? "#ffffff" : "#E5E4E2",    
+                roughness: 0.2,    
+                metalness: 0.3    
+            }), [tex]);    
+    
+            if (shape === 'box') {    
+                return (    
+                    <mesh ref={meshRef} castShadow receiveShadow>    
+                        <boxGeometry args={[1, 1, 1]} />     
+                        {tex ? (    
+                            <>    
+                                <primitive object={whiteBackingMaterial} attach="material-0" />    
+                                <primitive object={whiteBackingMaterial} attach="material-1" />    
+                                <primitive object={whiteBackingMaterial} attach="material-2" />    
+                                <primitive object={whiteBackingMaterial} attach="material-3" />    
+                                <primitive object={photoMaterial} attach="material-4" />    
+                                <primitive object={whiteBackingMaterial} attach="material-5" />    
+                            </>    
+                        ) : (    
+                            <meshStandardMaterial color="#FFD700" metalness={1} roughness={0.1} />    
+                        )}    
+                    </mesh>    
+                );    
+            } else {    
+                return (    
+                    <mesh ref={meshRef} castShadow receiveShadow>    
+                        <sphereGeometry args={[0.6, 64, 64]} />    
+                        <primitive object={sphereMaterial} attach="material" />    
+                    </mesh>    
+                );    
+            }    
+        };    
+    
+        // --- Photo Gallery Manager (Now handles GL context) ---    
+        const PhotoGallery = ({ isTree, textureData }) => {    
+            const { gl } = useThree(); // Safe to use here!    
+                
+            // Apply Anisotropy inside Canvas context    
+            useEffect(() => {    
+                if(textureData && textureData.length > 0) {    
+                    const maxAnisotropy = gl.capabilities.getMaxAnisotropy();    
+                    textureData.forEach(data => {    
+                        if(data.tex) {    
+                            if(data.tex.anisotropy !== maxAnisotropy) {    
+                                data.tex.anisotropy = maxAnisotropy;    
+                                data.tex.needsUpdate = true;    
+                            }    
+                        }    
+                    });    
+                }    
+            }, [textureData, gl]);    
+    
+            const items = useMemo(() => {    
+                const temp = [];    
+                const total = 220;    
+                for (let i = 0; i < total; i++) {    
+                    const isBox = i % 3 !== 0; // More boxes than spheres (boxes look better as photos)    
+                    const tp = getTreePos(Math.floor(Math.random() * CONFIG.particleCount), CONFIG.particleCount, 1.1, 0.9);    
+                    tp.x += (Math.random()-0.5)*2; tp.z += (Math.random()-0.5)*2;    
+                    const sp = getScatterPos();    
+                    temp.push({ id: i, shape: isBox ? 'box' : 'sphere', treePos: tp, scatterPos: sp });    
+                }    
+                return temp;    
+            }, []);    
+    
+            return (    
+                <group>    
+                    {items.map((item, i) => {    
+                        let assignedData = null;    
+                        if (textureData && textureData.length > 0) {    
+                            assignedData = textureData[i % textureData.length];    
+                        }    
+                        return (    
+                            <PhotoElement     
+                                key={i}    
+                                index={i}    
+                                isTree={isTree}    
+                                textureObj={assignedData}    
+                                shape={item.shape}    
+                                treePos={item.treePos}    
+                                scatterPos={item.scatterPos}    
+                            />    
+                        );    
+                    })}    
+                </group>    
+            );    
+        };    
+    
+        // --- Standard Decor Elements ---    
+        const RoyalRibbon = ({ isTree }) => {          
+            const materialRef = useRef();          
+            const curve = useMemo(() => {          
+                const points = []; const turns = 5; const height = CONFIG.treeHeight + 8;          
+                for (let i = 0; i <= 300; i++) {          
+                    const t = i / 300; const angle = t * Math.PI * 2 * turns;          
+                    const radius = (1 - t) * (CONFIG.treeRadius + 4) + 1.0;           
+                    points.push(new THREE.Vector3(Math.cos(angle) * radius, (t - 0.5) * height, Math.sin(angle) * radius));          
+                }          
+                return new THREE.CatmullRomCurve3(points);          
+            }, []);  
+              
+            // FIXED: The shader replacement now uses proper newlines for the #include directives.  
+            const onBeforeCompile = (shader) => {          
+                shader.uniforms.uProgress = { value: 0 };   
+                shader.uniforms.uTime = { value: 0 };      
+                materialRef.current = shader;          
+                  
+                shader.fragmentShader = shader.fragmentShader.replace(  
+                    '#include <common>',   
+                    `#include <common> \n uniform float uProgress; uniform float uTime;`  
+                );  
+                  
+                shader.fragmentShader = shader.fragmentShader.replace(  
+                    '#include <dithering_fragment>',   
+                    `  
+                    if (vUv.x > uProgress) discard;   
+                    vec3 viewDir = normalize(vViewPosition);   
+                    float fresnel = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 3.0);   
+                    float alpha = 0.15 + fresnel * 0.5;   
+                    float noise = (fract(sin(dot(vUv.xy * 100.0 + uTime * 0.5, vec2(12.9898,78.233))) * 43758.5453));   
+                    float sparkle = step(0.98, noise);   
+                    vec3 goldColor = vec3(1.0, 0.9, 0.5);   
+                    float edge = smoothstep(uProgress - 0.05, uProgress, vUv.x);   
+                    gl_FragColor.rgb = mix(gl_FragColor.rgb, goldColor, fresnel * 0.5);   
+                    gl_FragColor.rgb += goldColor * sparkle * 2.0;   
+                    gl_FragColor.rgb += vec3(1.0, 0.8, 0.2) * edge * 2.0;   
+                    gl_FragColor.a = alpha * gl_FragColor.a;   
+                    \n#include <dithering_fragment>  
+                    `  
+                );          
+            };          
+            useFrame((state, delta) => {          
+                if (materialRef.current) {          
+                    const target = isTree ? 1.0 : 0.0;          
+                    materialRef.current.uniforms.uProgress.value += (target - materialRef.current.uniforms.uProgress.value) * delta * 0.8;      
+                    materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;      
+                }          
+            });          
+            return <mesh><tubeGeometry args={[curve, 600, 0.12, 8, false]} /><meshStandardMaterial color="#ffeedd" emissive="#443300" emissiveIntensity={0.5} metalness={0.1} roughness={0.4} side={THREE.DoubleSide} onBeforeCompile={onBeforeCompile} transparent={true} opacity={1} depthWrite={false} blending={THREE.AdditiveBlending} defines={{ USE_UV: '' }} /></mesh>;          
+        };          
+        const RibbonBows = ({ isTree }) => {      
+            const bows = useMemo(() => {      
+                const items = []; const count = 16;      
+                for(let i=0; i<count; i++) {      
+                    const yRatio = 0.15 + (i / count) * 0.8;       
+                    const y = (yRatio * CONFIG.treeHeight) - (CONFIG.treeHeight/2);      
+                    const r = (1 - yRatio) * CONFIG.treeRadius * 1.05;       
+                    const a = (i * 2.4) + Math.random();       
+                    items.push({ pos: [Math.cos(a)*r, y, Math.sin(a)*r], rot: [0, -a + Math.PI/2, 0], scale: 0.8 + Math.random() * 0.6 });      
+                } return items;      
+            }, []);      
+            const groupRef = useRef();      
+            useFrame((state, delta) => {      
+                if(groupRef.current) {      
+                    const targetScale = isTree ? 1 : 0;      
+                    groupRef.current.children.forEach((child, i) => {      
+                        const s = bows[i].scale * targetScale;      
+                        child.scale.lerp(new THREE.Vector3(s, s, s), delta * 3);      
+                        child.position.y = bows[i].pos[1] + Math.sin(state.clock.elapsedTime * 1.5 + i) * 0.15;      
+                    });      
+                }      
+            });      
+            const SingleBow = ({ position, scale, rotation }) => {    
+                const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#ffb7c5", emissive: "#ff69b4", emissiveIntensity: 0.2, roughness: 0.8, metalness: 0.0, transparent: true, opacity: 0.95 }), []);    
+                return <group position={position} rotation={rotation} scale={scale}><mesh material={mat}><sphereGeometry args={[0.2, 16, 16]} /></mesh><mesh position={[-0.35, 0.15, 0]} rotation={[0, 0, Math.PI/4]} material={mat}><sphereGeometry args={[0.35, 16, 16]} /><group scale={[1, 0.6, 0.5]} /></mesh><mesh position={[0.35, 0.15, 0]} rotation={[0, 0, -Math.PI/4]} material={mat}><sphereGeometry args={[0.35, 16, 16]} /><group scale={[1, 0.6, 0.5]} /></mesh><mesh position={[-0.25, -0.6, 0.05]} rotation={[0, 0, 0.2]} material={mat}><boxGeometry args={[0.25, 0.8, 0.05]} /></mesh><mesh position={[0.25, -0.6, 0.05]} rotation={[0, 0, -0.2]} material={mat}><boxGeometry args={[0.25, 0.8, 0.05]} /></mesh></group>    
+            };    
+            return <group ref={groupRef}>{bows.map((b, i) => <SingleBow key={i} position={b.pos} rotation={b.rot} scale={[0,0,0]} />)}</group>      
+        }          
+        const RoyalStar = ({ isTree }) => {          
+            const ref = useRef();          
+            useFrame((_, delta) => {          
+                if(ref.current) {          
+                    ref.current.position.lerp(isTree ? new THREE.Vector3(0, CONFIG.treeHeight/2+1, 0) : new THREE.Vector3(0,0,50), delta*1.5);          
+                    const s = isTree ? 1.2 : 0; ref.current.scale.lerp(new THREE.Vector3(s,s,s), delta*2);          
+                    ref.current.rotation.y += delta;          
+                }          
+            });          
+            return <group ref={ref}><mesh><extrudeGeometry args={[new THREE.Shape().moveTo(0,1.5).lineTo(0.4,0.4).lineTo(1.5,0.4).lineTo(0.6,-0.2).lineTo(0.9,-1.2).lineTo(0,-0.6).lineTo(-0.9,-1.2).lineTo(-0.6,-0.2).lineTo(-1.5,0.4).lineTo(-0.4,0.4).closePath(), {depth:0.4, bevelEnabled:true, bevelThickness:0.1, bevelSize:0.05}]} /><meshStandardMaterial color="#ffdf80" emissive="#ffaa00" emissiveIntensity={1.5} roughness={0} metalness={1} /></mesh><Sparkles count={40} scale={4} /><pointLight color="#ffd700" intensity={isTree?50:0} distance={10} /></group>;          
+        };          
+          
+        // --- Main App ---          
+        const App = () => {          
+            const [isStarted, setStarted] = useState(false);          
+            const [isTree, setIsTree] = useState(false);          
+            const [statusText, setStatusText] = useState("Waiting for permission...");    
+            const [textureData, setTextureData] = useState([]);    
+          
+            const handleStart = () => setStarted(true);          
+            const handleGesture = (isFist) => setIsTree(isFist);          
+            const toggleTree = () => setIsTree(!isTree);          
+    
+            const handleFolderUpload = (event) => {    
+                const files = event.target.files;    
+                if (files && files.length > 0) {    
+                    const loadedData = [];    
+                    const loader = new THREE.TextureLoader();    
+    
+                    // Removed gl dependency here. It is now handled inside PhotoGallery    
+                    Array.from(files).forEach(file => {    
+                        if (file.type.startsWith('image/')) {    
+                            const url = URL.createObjectURL(file);    
+                            const img = new Image();    
+                            img.src = url;    
+                            img.onload = () => {    
+                                const aspect = img.width / img.height;    
+                                loader.load(url, (tex) => {    
+                                    tex.colorSpace = THREE.SRGBColorSpace;    
+                                    tex.minFilter = THREE.LinearMipmapLinearFilter;    
+                                    tex.magFilter = THREE.LinearFilter;    
+                                    tex.generateMipmaps = true;    
+                                        
+                                    loadedData.push({ tex: tex, aspect: aspect });    
+                                    if(loadedData.length >= Math.min(files.length, 200) || loadedData.length % 5 === 0) {    
+                                        setTextureData([...loadedData]);    
+                                    }    
+                                });    
+                            };    
+                        }    
+                    });    
+                }    
+            };    
+          
+            return (          
+                <>          
+                    <div id="intro-screen" className={isStarted ? 'hidden' : ''}>          
+                        <h1>ROYAL HOLIDAY</h1>          
+                        <h2 style={{border:'none', fontSize:'1.2rem', marginBottom:'40px'}}>Memories in Gold</h2>          
+                        <button className="btn" onClick={handleStart}>Enter</button>          
+                    </div>          
+          
+                    <div className={`ui-overlay ${isStarted ? 'ui-visible' : 'ui-hidden'}`}>          
+                        <div className="header-area">          
+                            <h1>ROYAL HOLIDAY</h1>          
+                            <h2>Gallery Edition</h2>          
+                        </div>          
+                        <div className="controls-area">          
+                            <div className="status-text">{statusText}</div>          
+                            <div className="btn-group">    
+                                <button className="btn" onClick={toggleTree}>    
+                                    {isTree ? "Disperse" : "Summon Tree"}    
+                                </button>    
+                                <div className="file-input-wrapper">    
+                                    <button className="btn" style={{fontSize:'0.8rem'}}>Upload Folder</button>    
+                                    <input type="file" webkitdirectory="" mozdirectory="" directory="" onChange={handleFolderUpload} />    
+                                </div>    
+                            </div>    
+                        </div>          
+                    </div>          
+          
+                    {isStarted && <HandTracker onStateChange={handleGesture} setStatus={setStatusText} />}          
+          
+                    <Canvas dpr={[1, 2]} gl={{ toneMapping: THREE.ReinhardToneMapping, toneMappingExposure: 2.0, antialias: true }} camera={{ position: [0, 2, 60], fov: 45 }} shadows>          
+                        <Environment resolution={256}>          
+                            <group rotation={[-Math.PI / 3, 0, 1]}>          
+                                <Lightformer form="ring" intensity={4} rotation-x={Math.PI / 2} position={[0, 5, -9]} scale={[10, 10, 1]} />          
+                                <Lightformer form="rect" intensity={4} rotation-y={Math.PI / 2} position={[-5, 1, -1]} scale={[10, 10, 1]} />          
+                            </group>          
+                        </Environment>          
+                        <color attach="background" args={['#000502']} />          
+                        <fog attach="fog" args={['#000502', 40, 120]} />          
+                        <CameraController />          
+                        <spotLight position={[20, 60, 20]} intensity={200} color="#fff5e6" angle={0.5} castShadow />          
+                        <pointLight position={[-40, 10, -40]} intensity={50} color="#ffffff" />          
+                        <pointLight position={[30, -20, 30]} intensity={40} color="#ffaa55" />          
+                            
+                        <Float speed={1.0} rotationIntensity={0.2} floatIntensity={0.5}>          
+                            <Foliage isTree={isTree} />          
+                            <PhotoGallery isTree={isTree} textureData={textureData} />          
+                            <RibbonBows isTree={isTree} />      
+                            <RoyalStar isTree={isTree} />          
+                            <RoyalRibbon isTree={isTree} />          
+                            <Sparkles count={300} scale={50} size={10} speed={0.4} opacity={0.4} color="#ffd700" />          
+                            <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />          
+                        </Float>          
+                            
+                        <EffectComposer disableNormalPass>          
+                            <Bloom luminanceThreshold={0.9} mipmapBlur intensity={1.5} radius={0.4} />          
+                            <Noise opacity={0.05} />          
+                            <Vignette eskil={false} offset={0.1} darkness={0.7} />          
+                        </EffectComposer>          
+                    </Canvas>          
+                </>          
+            );          
+        };          
+          
+        const root = createRoot(document.getElementById('canvas-container'));          
+        root.render(<App />);          
+    </script>          
+</body>          
+</html>
